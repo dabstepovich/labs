@@ -41,6 +41,7 @@ class MainWindow : public QMainWindow {
   QTableView *table_view_;
   QPushButton *add_button_;
   QPushButton *delete_button_;
+  QPushButton *random_button_;
   QLabel *status_label_;
   QStandardItemModel *model_;
 
