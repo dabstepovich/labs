@@ -7,7 +7,7 @@
 struct FuelPrice {
   QString fuel_type;
   QDate date;
-  double price;
+  double price = 0.0;
 };
 
 #endif  

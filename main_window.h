@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QStandardItemModel>
 
+#include "fuel_model.h"
 #include "fuel_price.h"
 
 QT_BEGIN_NAMESPACE
@@ -27,25 +28,21 @@ class MainWindow : public QMainWindow {
 
  private:
   void SetupUi();
-
   void SetupTableModel();
+  void RefreshTable();
+  void AppendRowToTable(const FuelPrice &fp);
+  int  GetSelectedRow() const;
+  void SaveCurrentState();
+  void ShowParseErrors(const QStringList &errors);
 
-  void AppendRowToTable(const FuelPrice &fuel_price);
+  QTableView        *table_view_;
+  QPushButton       *add_button_;
+  QPushButton       *delete_button_;
+  QLabel            *status_label_;
+  QStandardItemModel *table_model_;  
 
-  int GetSelectedRow() const;
-
-  void SaveCurrentStateToFile();
-
-  FuelPrice ReadRowFromModel(int row) const;
-
-  QTableView *table_view_;
-  QPushButton *add_button_;
-  QPushButton *delete_button_;
-  QPushButton *random_button_;
-  QLabel *status_label_;
-  QStandardItemModel *model_;
-
-  QString current_file_path_;
+  FuelModel  fuel_model_;
+  QString    current_file_path_;
 };
 
 #endif 

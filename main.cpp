@@ -1,7 +1,5 @@
 #include <QApplication>
 #include <QFileDialog>
-#include <QMessageBox>
-
 #include "main_window.h"
 
 int main(int argc, char *argv[]) {

@@ -1,4 +1,3 @@
-
 #include "main_window.h"
 
 #include <QDialog>
@@ -17,28 +16,24 @@
 #include <QHBoxLayout>
 #include <QWidget>
 
-#include "file_reader.h"
-
 namespace {
 
 constexpr int kColumnCount = 3;
 const QStringList kHeaders = {"Тип топлива", "Дата", "Цена (руб.)"};
+const QString kDateFormat  = "yyyy.MM.dd";
 
 constexpr int kColFuelType = 0;
-constexpr int kColDate = 1;
-constexpr int kColPrice = 2;
+constexpr int kColDate     = 1;
+constexpr int kColPrice    = 2;
 
-const QString kDateFormat = "yyyy.MM.dd";
-
-}  
-
+} 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
       table_view_(nullptr),
       add_button_(nullptr),
       delete_button_(nullptr),
       status_label_(nullptr),
-      model_(nullptr),
+      table_model_(nullptr),
       current_file_path_(QString()) {
   SetupUi();
   SetupTableModel();
@@ -48,97 +43,108 @@ void MainWindow::SetupUi() {
   setWindowTitle("Цены на топливо");
   resize(640, 480);
 
-  QWidget *central_widget = new QWidget(this);
-  setCentralWidget(central_widget);
+  QWidget *central = new QWidget(this);
+  setCentralWidget(central);
 
-  table_view_ = new QTableView();
+  table_view_ = new QTableView(central);
   table_view_->setSelectionBehavior(QAbstractItemView::SelectRows);
   table_view_->setSelectionMode(QAbstractItemView::SingleSelection);
   table_view_->setEditTriggers(QAbstractItemView::NoEditTriggers);
   table_view_->horizontalHeader()->setStretchLastSection(true);
   table_view_->verticalHeader()->setVisible(false);
 
-  add_button_ = new QPushButton("Добавить", central_widget);
-  delete_button_ = new QPushButton("Удалить", central_widget);
+  add_button_    = new QPushButton("Добавить", central);
+  delete_button_ = new QPushButton("Удалить",  central);
+  status_label_  = new QLabel("Готово.", central);
 
-  status_label_ = new QLabel("Готово.", central_widget);
+  QHBoxLayout *btn_layout = new QHBoxLayout();
+  btn_layout->addWidget(add_button_);
+  btn_layout->addWidget(delete_button_);
+  btn_layout->addStretch();
 
-  QHBoxLayout *button_layout = new QHBoxLayout();
-  button_layout->addWidget(add_button_);
-  button_layout->addWidget(delete_button_);
-  button_layout->addStretch();
-
-  QVBoxLayout *main_layout = new QVBoxLayout(central_widget);
+  QVBoxLayout *main_layout = new QVBoxLayout(central);
   main_layout->addWidget(table_view_);
-  main_layout->addLayout(button_layout);
+  main_layout->addLayout(btn_layout);
   main_layout->addWidget(status_label_);
 
-  connect(add_button_, &QPushButton::clicked,
+  connect(add_button_,    &QPushButton::clicked,
           this, &MainWindow::OnAddButtonClicked);
   connect(delete_button_, &QPushButton::clicked,
           this, &MainWindow::OnDeleteButtonClicked);
 }
 
 void MainWindow::SetupTableModel() {
-  model_ = new QStandardItemModel(0, kColumnCount, this);
-  model_->setHorizontalHeaderLabels(kHeaders);
-  table_view_->setModel(model_);
+  table_model_ = new QStandardItemModel(0, kColumnCount, this);
+  table_model_->setHorizontalHeaderLabels(kHeaders);
+  table_view_->setModel(table_model_);
+}
+
+void MainWindow::RefreshTable() {
+  table_model_->removeRows(0, table_model_->rowCount());
+  for (const FuelPrice &fp : fuel_model_.prices()) {
+    AppendRowToTable(fp);
+  }
+}
+
+void MainWindow::AppendRowToTable(const FuelPrice &fp) {
+  QList<QStandardItem *> row;
+  row.append(new QStandardItem(fp.fuel_type));
+  row.append(new QStandardItem(fp.date.toString(kDateFormat)));
+  row.append(new QStandardItem(QString::number(fp.price, 'f', 2)));
+  table_model_->appendRow(row);
 }
 
 void MainWindow::LoadFromFile(const QString &file_path) {
   current_file_path_ = file_path;
-  model_->removeRows(0, model_->rowCount());
 
-  QList<FuelPrice> fuel_prices = ReadFuelPricesFromFile(file_path);
+  QStringList errors;
+  int loaded = 0;
 
-  for (const FuelPrice &fp : fuel_prices) {
-    AppendRowToTable(fp);
-  }
-
-  status_label_->setText(
-      QString("Загружено записей: %1").arg(fuel_prices.size()));
-}
-
-void MainWindow::AppendRowToTable(const FuelPrice &fuel_price) {
-  QList<QStandardItem *> row;
-  row.append(new QStandardItem(fuel_price.fuel_type));
-  row.append(new QStandardItem(fuel_price.date.toString(kDateFormat)));
-  row.append(new QStandardItem(QString::number(fuel_price.price, 'f', 2)));
-  model_->appendRow(row);
-}
-
-FuelPrice MainWindow::ReadRowFromModel(int row) const {
-  FuelPrice fp;
-  fp.fuel_type = model_->item(row, kColFuelType)->text();
-  fp.date = QDate::fromString(model_->item(row, kColDate)->text(), kDateFormat);
-  fp.price = model_->item(row, kColPrice)->text().toDouble();
-  return fp;
-}
-
-void MainWindow::SaveCurrentStateToFile() {
-  if (current_file_path_.isEmpty()) {
+  try {
+    loaded = fuel_model_.LoadFromFile(file_path, &errors);
+  } catch (const std::exception &ex) {
+    QMessageBox::critical(this, "Ошибка открытия файла",
+                          QString::fromStdString(ex.what()));
     return;
   }
 
-  QList<FuelPrice> fuel_prices;
-  for (int row = 0; row < model_->rowCount(); ++row) {
-    fuel_prices.append(ReadRowFromModel(row));
+  RefreshTable();
+
+  if (!errors.isEmpty()) {
+    ShowParseErrors(errors);
   }
 
-  bool ok = SaveFuelPricesToFile(current_file_path_, fuel_prices);
+  status_label_->setText(
+      QString("Загружено записей: %1 (пропущено: %2)")
+          .arg(loaded).arg(errors.size()));
+}
 
-  if (!ok) {
-    QMessageBox::warning(this, "Ошибка",
-                         "Не удалось сохранить файл:\n" + current_file_path_);
+void MainWindow::ShowParseErrors(const QStringList &errors) {
+  QMessageBox box(this);
+  box.setWindowTitle("Ошибки при загрузке файла");
+  box.setIcon(QMessageBox::Warning);
+  box.setText(
+      QString("Часть строк пропущена из-за ошибок (%1 шт.).\n"
+              "Подробности:").arg(errors.size()));
+  box.setDetailedText(errors.join('\n'));
+  box.exec();
+}
+
+void MainWindow::SaveCurrentState() {
+  if (current_file_path_.isEmpty()) {
+    return;
+  }
+  try {
+    fuel_model_.SaveToFile(current_file_path_);
+  } catch (const std::exception &ex) {
+    QMessageBox::warning(this, "Ошибка сохранения",
+                         QString::fromStdString(ex.what()));
   }
 }
 
 int MainWindow::GetSelectedRow() const {
-  QModelIndexList selection = table_view_->selectionModel()->selectedRows();
-  if (selection.isEmpty()) {
-    return -1;
-  }
-  return selection.first().row();
+  QModelIndexList sel = table_view_->selectionModel()->selectedRows();
+  return sel.isEmpty() ? -1 : sel.first().row();
 }
 
 void MainWindow::OnAddButtonClicked() {
@@ -148,13 +154,13 @@ void MainWindow::OnAddButtonClicked() {
   QFormLayout *form = new QFormLayout(&dialog);
 
   QLineEdit *fuel_type_edit = new QLineEdit(&dialog);
-  QLineEdit *date_edit = new QLineEdit(&dialog);
+  QLineEdit *date_edit      = new QLineEdit(&dialog);
   date_edit->setPlaceholderText("ГГГГ.ММ.ДД");
   QLineEdit *price_edit = new QLineEdit(&dialog);
-  price_edit->setValidator(new QDoubleValidator(0, 9999, 2, &dialog));
+  price_edit->setValidator(new QDoubleValidator(0, 999999, 2, &dialog));
 
   form->addRow("Тип топлива:", fuel_type_edit);
-  form->addRow("Дата:", date_edit);
+  form->addRow("Дата:",        date_edit);
   form->addRow("Цена (руб.):", price_edit);
 
   QDialogButtonBox *buttons = new QDialogButtonBox(
@@ -169,14 +175,13 @@ void MainWindow::OnAddButtonClicked() {
   }
 
   if (fuel_type_edit->text().trimmed().isEmpty() ||
-      date_edit->text().trimmed().isEmpty() ||
+      date_edit->text().trimmed().isEmpty()       ||
       price_edit->text().trimmed().isEmpty()) {
     QMessageBox::warning(this, "Ошибка", "Все поля должны быть заполнены.");
     return;
   }
 
-  QDate parsed_date = QDate::fromString(date_edit->text().trimmed(),
-                                        kDateFormat);
+  QDate parsed_date = QDate::fromString(date_edit->text().trimmed(), kDateFormat);
   if (!parsed_date.isValid()) {
     QMessageBox::warning(this, "Ошибка",
                          "Неверный формат даты. Используйте: ГГГГ.ММ.ДД");
@@ -185,29 +190,35 @@ void MainWindow::OnAddButtonClicked() {
 
   FuelPrice new_entry;
   new_entry.fuel_type = fuel_type_edit->text().trimmed();
-  new_entry.date = parsed_date;
-  new_entry.price = price_edit->text().toDouble();
+  new_entry.date      = parsed_date;
+  new_entry.price     = price_edit->text().toDouble();
 
+  fuel_model_.AddEntry(new_entry);
   AppendRowToTable(new_entry);
-
-  SaveCurrentStateToFile();
+  SaveCurrentState();
 
   status_label_->setText(
-      QString("Записей в таблице: %1").arg(model_->rowCount()));
+      QString("Записей в таблице: %1").arg(fuel_model_.count()));
 }
 
 void MainWindow::OnDeleteButtonClicked() {
   int row = GetSelectedRow();
   if (row == -1) {
-    QMessageBox::information(this, "Удаление",
-                             "Выберите строку для удаления.");
+    QMessageBox::information(this, "Удаление", "Выберите строку для удаления.");
     return;
   }
 
-  model_->removeRow(row);
+  try {
+    fuel_model_.RemoveEntry(row);
+  } catch (const std::out_of_range &ex) {
+    QMessageBox::warning(this, "Ошибка удаления",
+                         QString::fromStdString(ex.what()));
+    return;
+  }
 
-  SaveCurrentStateToFile();
+  table_model_->removeRow(row);
+  SaveCurrentState();
 
   status_label_->setText(
-      QString("Записей в таблице: %1").arg(model_->rowCount()));
+      QString("Записей в таблице: %1").arg(fuel_model_.count()));
 }
