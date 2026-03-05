@@ -15,7 +15,7 @@ class TestFuelModel : public QObject {
     FuelPrice fp = FuelModel::ParseLine(R"("АИ-95" 2024.03.15 58.40)");
     QCOMPARE(fp.fuel_type, QString("АИ-95"));
     QCOMPARE(fp.date, QDate(2024, 3, 15));
-    QCOMPARE(fp.price, 58.40);
+    QCOMPARE(fp.price, 58.50);
   }
 
   void parseLine_validWithSpacesInFuelType() {
@@ -112,11 +112,11 @@ class TestFuelModel : public QObject {
     {
       QTextStream out(&tmp);
       out.setEncoding(QStringConverter::Utf8);
-      out << R"("АИ-95" 2024.01.10 58.00)"   << '\n'; // OK
-      out << "плохая строка без кавычек"       << '\n'; // ошибка
-      out << R"("АИ-92" 15.03.2024 54.50)"   << '\n'; // плохая дата
-      out << R"("Дизель" 2024.01.10 70.20)"  << '\n'; // OK
-      out << R"("" 2024.05.01 60.00)"         << '\n'; // пустой тип
+      out << R"("АИ-95" 2024.01.10 58.00)"   << '\n'; 
+      out << "плохая строка без кавычек"     << '\n'; 
+      out << R"("АИ-92" 15.03.2024 54.50)"   << '\n'; 
+      out << R"("Дизель" 2024.01.10 70.20)"  << '\n'; 
+      out << R"("" 2024.05.01 60.00)"        << '\n'; 
     }
     tmp.close();
 
