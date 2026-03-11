@@ -21,6 +21,11 @@ target_link_libraries(fuel_model_lib PUBLIC Qt6::Core)
 if(ENABLE_COVERAGE)
     target_compile_options(fuel_model_lib PRIVATE --coverage -O0 -g)
     target_link_options(fuel_model_lib PRIVATE --coverage)
+
+    target_compile_options(TestFuelModel PRIVATE --coverage -O0 -g)
+    target_link_options(TestFuelModel PRIVATE --coverage)
+
+    target_link_options(FuelPrices PRIVATE --coverage)
 endif()
 
 add_executable(FuelPrices
@@ -36,15 +41,5 @@ add_executable(TestFuelModel
     test_fuel_model.cpp
 )
 target_link_libraries(TestFuelModel PRIVATE fuel_model_lib Qt6::Test)
-
-if(ENABLE_COVERAGE)
-    target_compile_options(fuel_model_lib PRIVATE --coverage -O0 -g)
-    target_link_options(fuel_model_lib PRIVATE --coverage)
-
-    target_compile_options(TestFuelModel PRIVATE --coverage -O0 -g)
-    target_link_options(TestFuelModel PRIVATE --coverage)
-
-    target_link_options(FuelPrices PRIVATE --coverage)
-endif()
 
 add_test(NAME TestFuelModel COMMAND TestFuelModel)

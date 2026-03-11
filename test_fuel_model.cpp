@@ -15,7 +15,7 @@ class TestFuelModel : public QObject {
     FuelPrice fp = FuelModel::ParseLine(R"("АИ-95" 2024.03.15 58.40)");
     QCOMPARE(fp.fuel_type, QString("АИ-95"));
     QCOMPARE(fp.date, QDate(2024, 3, 15));
-    QCOMPARE(fp.price, 58.50);
+    QCOMPARE(fp.price, 58.40);
   }
 
   void parseLine_validWithSpacesInFuelType() {
