@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 project(FuelPrices LANGUAGES CXX)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_AUTOMOC ON)
@@ -8,24 +9,21 @@ set(CMAKE_AUTOUIC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Test)
 
-option(ENABLE_COVERAGE "Enable test coverage" OFF)
+option(ENABLE_COVERAGE "Enable test coverage (GCC/Clang)" OFF)
 
-add_library(fuel_model_lib STATIC
+add_library(fuel_logic_lib STATIC
     fuel_model.cpp
     fuel_model.h
+    command_processor.cpp
+    command_processor.h
     fuel_price.h
     parse_exception.h
 )
-target_link_libraries(fuel_model_lib PUBLIC Qt6::Core)
+target_link_libraries(fuel_logic_lib PUBLIC Qt6::Core)
 
 if(ENABLE_COVERAGE)
-    target_compile_options(fuel_model_lib PRIVATE --coverage -O0 -g)
-    target_link_options(fuel_model_lib PRIVATE --coverage)
-
-    target_compile_options(TestFuelModel PRIVATE --coverage -O0 -g)
-    target_link_options(TestFuelModel PRIVATE --coverage)
-
-    target_link_options(FuelPrices PRIVATE --coverage)
+    target_compile_options(fuel_logic_lib PRIVATE --coverage -O0 -g)
+    target_link_options(fuel_logic_lib  PRIVATE --coverage)
 endif()
 
 add_executable(FuelPrices
@@ -33,13 +31,18 @@ add_executable(FuelPrices
     main_window.cpp
     main_window.h
 )
-target_link_libraries(FuelPrices PRIVATE fuel_model_lib Qt6::Widgets)
+target_link_libraries(FuelPrices PRIVATE fuel_logic_lib Qt6::Widgets)
 
 enable_testing()
 
-add_executable(TestFuelModel
-    test_fuel_model.cpp
+add_executable(TestAll
+    test_all.cpp
 )
-target_link_libraries(TestFuelModel PRIVATE fuel_model_lib Qt6::Test)
+target_link_libraries(TestAll PRIVATE fuel_logic_lib Qt6::Test)
 
-add_test(NAME TestFuelModel COMMAND TestFuelModel)
+if(ENABLE_COVERAGE)
+    target_compile_options(TestAll PRIVATE --coverage -O0 -g)
+    target_link_options(TestAll    PRIVATE --coverage)
+endif()
+
+add_test(NAME TestAll COMMAND TestAll)

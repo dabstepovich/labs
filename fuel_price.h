@@ -1,8 +1,8 @@
 #ifndef FUEL_PRICE_H
 #define FUEL_PRICE_H
 
-#include <QString>
 #include <QDate>
+#include <QString>
 
 struct FuelPrice {
   QString fuel_type;
@@ -10,4 +10,4 @@ struct FuelPrice {
   double price = 0.0;
 };
 
-#endif  
+#endif
