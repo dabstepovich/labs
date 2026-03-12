@@ -35,6 +35,8 @@ public:
   static std::function<bool(const FuelPrice &)>
   ParseRemCondition(const QString &condition);
 
+  static std::pair<QString, QString> ParseFilterArgument(const QString &args);
+
 private:
   FuelModel &model_;
   SaveFn save_fn_;
@@ -42,6 +44,7 @@ private:
   CommandResult HandleAdd(const QString &args);
   CommandResult HandleRem(const QString &args);
   CommandResult HandleSave(const QString &args);
+  CommandResult HandleFilter(const QString &args);
 };
 
 #endif

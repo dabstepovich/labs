@@ -65,6 +65,8 @@ CommandResult CommandProcessor::ExecuteLine(const QString &line) {
     return HandleRem(args);
   if (keyword == "SAVE")
     return HandleSave(args);
+  if (keyword == "FILTER")
+    return HandleFilter(args);
 
   return {false, {}, QString("Неизвестная команда: \"%1\"").arg(keyword)};
 }
@@ -212,6 +214,86 @@ CommandResult CommandProcessor::HandleRem(const QString &args) {
   } catch (const ParseException &ex) {
     return {false, {}, ex.qwhat()};
   }
+}
+
+std::pair<QString, QString>
+CommandProcessor::ParseFilterArgument(const QString &args) {
+  QString trimmed = args.trimmed();
+  if (trimmed.isEmpty()) {
+    throw ParseException(
+        "FILTER: не указаны аргументы (ожидается: \"<подстрока>\" \"<файл>\")");
+  }
+
+  if (!trimmed.startsWith('"')) {
+    throw ParseException(
+        QString("FILTER: подстрока должна быть в кавычках: \"%1\"")
+            .arg(trimmed));
+  }
+  int close_first = trimmed.indexOf('"', 1);
+  if (close_first == -1) {
+    throw ParseException(
+        QString("FILTER: не найдена закрывающая кавычка подстроки: \"%1\"")
+            .arg(trimmed));
+  }
+  QString substring = trimmed.mid(1, close_first - 1);
+
+  QString rest = trimmed.mid(close_first + 1).trimmed();
+  if (!rest.startsWith('"')) {
+    throw ParseException(
+        QString("FILTER: путь к файлу должен быть в кавычках: \"%1\"")
+            .arg(rest));
+  }
+  int close_second = rest.indexOf('"', 1);
+  if (close_second == -1) {
+    throw ParseException(
+        QString("FILTER: не найдена закрывающая кавычка пути: \"%1\"")
+            .arg(rest));
+  }
+  QString filepath = rest.mid(1, close_second - 1);
+
+  if (filepath.isEmpty()) {
+    throw ParseException("FILTER: путь к файлу не может быть пустым");
+  }
+
+  return {substring, filepath};
+}
+
+CommandResult CommandProcessor::HandleFilter(const QString &args) {
+  QString substring, filepath;
+  try {
+    std::tie(substring, filepath) = ParseFilterArgument(args);
+  } catch (const ParseException &ex) {
+    return {false, {}, ex.qwhat()};
+  }
+
+  QList<FuelPrice> matched;
+  for (const FuelPrice &fp : model_.prices()) {
+    if (fp.fuel_type.contains(substring, Qt::CaseInsensitive)) {
+      matched.append(fp);
+    }
+  }
+
+  QFile file(filepath);
+  if (!file.open(QIODevice::WriteOnly | QIODevice::Text |
+                 QIODevice::Truncate)) {
+    return {false,
+            {},
+            QString("FILTER: не удалось открыть файл для записи: \"%1\"")
+                .arg(filepath)};
+  }
+  QTextStream out(&file);
+  out.setEncoding(QStringConverter::Utf8);
+  const QString kDateFormat = "yyyy.MM.dd";
+  for (const FuelPrice &fp : matched) {
+    out << '"' << fp.fuel_type << '"' << ' ' << fp.date.toString(kDateFormat)
+        << ' ' << QString::number(fp.price, 'f', 2) << '\n';
+  }
+  file.close();
+
+  return {true, QString("FILTER \"%1\": найдено %2 записей, сохранено в %3")
+                    .arg(substring)
+                    .arg(matched.size())
+                    .arg(filepath)};
 }
 
 CommandResult CommandProcessor::HandleSave(const QString &args) {

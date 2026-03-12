@@ -9,7 +9,6 @@
 
 class TestFuelModel : public QObject {
   Q_OBJECT
-
 private slots:
 
   void parseLine_validBasic() {
@@ -175,7 +174,6 @@ private slots:
   void addEntry_increasesCount() {
     FuelModel model;
     QCOMPARE(model.count(), 0);
-
     FuelPrice fp;
     fp.fuel_type = "АИ-98";
     fp.date = QDate(2024, 1, 1);
@@ -198,7 +196,6 @@ private slots:
     fp2.price = 2.0;
     model.AddEntry(fp1);
     model.AddEntry(fp2);
-
     model.RemoveEntry(0);
     QCOMPARE(model.count(), 1);
     QCOMPARE(model.prices().at(0).fuel_type, QString("Б"));
@@ -208,7 +205,6 @@ private slots:
     FuelModel model;
     QVERIFY_THROWS_EXCEPTION(std::out_of_range, model.RemoveEntry(0));
     QVERIFY_THROWS_EXCEPTION(std::out_of_range, model.RemoveEntry(-1));
-
     FuelPrice fp;
     fp.fuel_type = "X";
     fp.date = QDate(2024, 1, 1);
@@ -613,6 +609,89 @@ private slots:
     QCOMPARE(lines.size(), 2);
     QVERIFY(lines[0].contains("OK"));
     QVERIFY(lines[1].contains("ОШИБКА"));
+  }
+
+  void parseFilter_validArgs() {
+    auto [sub, path] =
+        CommandProcessor::ParseFilterArgument("\"АИ\" \"/tmp/out.txt\"");
+    QCOMPARE(sub, QString("АИ"));
+    QCOMPARE(path, QString("/tmp/out.txt"));
+  }
+
+  void parseFilter_substringWithSpaces() {
+    auto [sub, path] = CommandProcessor::ParseFilterArgument(
+        "\"Дизельное топливо\" \"/tmp/out.txt\"");
+    QCOMPARE(sub, QString("Дизельное топливо"));
+    QCOMPARE(path, QString("/tmp/out.txt"));
+  }
+
+  void parseFilter_pathWithSpaces() {
+    auto [sub, path] =
+        CommandProcessor::ParseFilterArgument("\"АИ\" \"/tmp/my file.txt\"");
+    QCOMPARE(sub, QString("АИ"));
+    QCOMPARE(path, QString("/tmp/my file.txt"));
+  }
+
+  void parseFilter_emptySubstring_valid() {
+    auto [sub, path] =
+        CommandProcessor::ParseFilterArgument("\"\" \"/tmp/out.txt\"");
+    QCOMPARE(sub, QString(""));
+    QCOMPARE(path, QString("/tmp/out.txt"));
+  }
+
+  void parseFilter_emptyArgs_throws() {
+    QVERIFY_THROWS_EXCEPTION(ParseException,
+                             CommandProcessor::ParseFilterArgument(""));
+  }
+
+  void parseFilter_noOpenQuote_throws() {
+    QVERIFY_THROWS_EXCEPTION(
+        ParseException,
+        CommandProcessor::ParseFilterArgument("АИ \"/tmp/out.txt\""));
+  }
+
+  void parseFilter_noCloseQuoteSubstring_throws() {
+    QVERIFY_THROWS_EXCEPTION(
+        ParseException,
+        CommandProcessor::ParseFilterArgument("\"АИ \"/tmp/out.txt\""));
+  }
+
+  void parseFilter_pathNotQuoted_throws() {
+    QVERIFY_THROWS_EXCEPTION(
+        ParseException,
+        CommandProcessor::ParseFilterArgument("\"АИ\" /tmp/out.txt"));
+  }
+
+  void parseFilter_noCloseQuotePath_throws() {
+    QVERIFY_THROWS_EXCEPTION(
+        ParseException,
+        CommandProcessor::ParseFilterArgument("\"АИ\" \"/tmp/out.txt"));
+  }
+
+  void parseFilter_emptyPath_throws() {
+    QVERIFY_THROWS_EXCEPTION(
+        ParseException, CommandProcessor::ParseFilterArgument("\"АИ\" \"\""));
+  }
+
+  void parseFilter_noFilepath_throws() {
+    QVERIFY_THROWS_EXCEPTION(ParseException,
+                             CommandProcessor::ParseFilterArgument("\"АИ\""));
+  }
+
+  void executeFilter_badArgs_failure() {
+    FuelModel model;
+    CommandProcessor cp(model);
+    CommandResult r = cp.ExecuteLine("FILTER");
+    QVERIFY(!r.success);
+    QVERIFY(!r.error.isEmpty());
+  }
+
+  void executeFilter_invalidPath_failure() {
+    FuelModel model = makeModel();
+    CommandProcessor cp(model);
+    CommandResult r =
+        cp.ExecuteLine("FILTER \"АИ\" \"/no_such_dir_xyz/out.txt\"");
+    QVERIFY(!r.success);
   }
 };
 
